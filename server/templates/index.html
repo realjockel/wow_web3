@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WoW Token Map Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        input, select {
+            margin: 5px 0;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #mapOwnersList, #characterNFTsList, #characterItemsList {
+            margin-top: 20px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        li:last-child {
+            border-bottom: none;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WoW Token Map Manager</h1>
+    <div class="section">
+        <button id="connectWallet">Connect Wallet</button>
+        <p id="walletAddress"></p>
+    </div>
+    <hr>
+    <div class="section">
+        <h2>Buy Map</h2>
+        <select id="buyMapId">
+            <option value="">Select an area</option>
+        </select>
+        <button id="buyMap">Buy Map</button>
+    </div>
+    <hr>
+    <div class="section">
+        <h2>List Map Owners</h2>
+        <button id="listMapOwners">List Map Owners</button>
+        <div id="mapOwnersList"></div>
+    </div>
+    <hr>
+    <div class="section">
+        <h2>Search Character NFTs</h2>
+        <input type="text" id="searchAddress" placeholder="Enter wallet address">
+        <button id="searchCharacterNFTs">Search</button>
+        <div id="characterNFTsList"></div>
+        <div id="characterItemsList"></div>
+    </div>
+
+    <script>
+        const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+        const contractABI = [
+        {
+            "inputs": [
+                {"internalType": "address", "name": "to", "type": "address"},
+                {"internalType": "uint256", "name": "amount", "type": "uint256"}
+            ],
+            "name": "mint",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {"internalType": "address", "name": "to", "type": "address"},
+                {"internalType": "uint256", "name": "amount", "type": "uint256"},
+                {"internalType": "uint256", "name": "mapId", "type": "uint256"}
+            ],
+            "name": "mint",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {"internalType": "address", "name": "from", "type": "address"},
+                {"internalType": "uint256", "name": "amount", "type": "uint256"}
+            ],
+            "name": "burn",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {"internalType": "address", "name": "from", "type": "address"},
+                {"internalType": "uint256", "name": "amount", "type": "uint256"},
+                {"internalType": "uint256", "name": "mapId", "type": "uint256"}
+            ],
+            "name": "burn",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [{"internalType": "uint256", "name": "mapId", "type": "uint256"}],
+            "name": "purchaseMap",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [{"internalType": "uint256", "name": "mapId", "type": "uint256"}],
+            "name": "getMapOwner",
+            "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "getOwner",
+            "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+            "name": "balanceOf",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        }
+        ];
+
+        let web3;
+        let contract;
+        let userAddress;
+        let areaNames = {};
+
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    web3 = new Web3(window.ethereum);
+                    userAddress = (await web3.eth.getAccounts())[0];
+                    document.getElementById('walletAddress').innerText = `Connected: ${userAddress}`;
+                    contract = new web3.eth.Contract(contractABI, contractAddress);
+                } catch (error) {
+                    console.error("Failed to connect wallet:", error);
+                }
+            } else {
+                alert("Please install MetaMask!");
+            }
+        }
+
+        async function loadAreaNames() {
+            try {
+                const response = await axios.get('/api/area_names');
+                areaNames = response.data;
+                const select = document.getElementById('buyMapId');
+                select.innerHTML = '<option value="">Select an area</option>';
+                for (const [id, info] of Object.entries(areaNames)) {
+                    let optionText = info.name;
+                    if (info.parentId !== 0 && areaNames[info.parentId]) {
+                        optionText += ` (${areaNames[info.parentId].name})`;
+                    }
+                    select.innerHTML += `<option value="${id}">${optionText}</option>`;
+                }
+            } catch (error) {
+                console.error("Failed to load area names:", error);
+            }
+        }
+
+        async function buyMap() {
+            if (!contract) {
+                alert("Please connect your wallet first!");
+                return;
+            }
+            const mapId = document.getElementById('buyMapId').value;
+            if (!mapId) {
+                alert("Please select an area to purchase.");
+                return;
+            }
+            try {
+                const latestBlock = await web3.eth.getBlockNumber();
+                
+                const balance = await contract.methods.balanceOf(userAddress).call(null, latestBlock);
+                const requiredBalance = web3.utils.toWei('10000', 'wei');
+                if (BigInt(balance) < BigInt(requiredBalance)) {
+                    alert(`Insufficient balance. You need at least 10000 tokens. Your balance: ${web3.utils.fromWei(balance, 'wei')}`);
+                    return;
+                }
+
+                const currentOwner = await contract.methods.getMapOwner(mapId).call(null, latestBlock);
+                if (currentOwner !== '0x0000000000000000000000000000000000000000') {
+                    alert(`Map ${mapId} is already owned by ${currentOwner}`);
+                    return;
+                }
+
+                const gasEstimate = await contract.methods.purchaseMap(mapId).estimateGas({from: userAddress});
+                
+                await contract.methods.purchaseMap(mapId).send({
+                    from: userAddress,
+                    gas: gasEstimate,
+                    gasPrice: await web3.eth.getGasPrice()
+                });
+                
+                alert(`Successfully purchased map ${mapId} (${areaNames[mapId].name})`);
+            } catch (error) {
+                console.error("Failed to buy map:", error);
+                alert("Failed to buy map. Check console for details.");
+            }
+        }
+
+        async function listMapOwners() {
+            const mapOwnersList = document.getElementById('mapOwnersList');
+            mapOwnersList.innerHTML = 'Loading...';
+            try {
+                const [ownersResponse, areasResponse] = await Promise.all([
+                    axios.get('/api/map_owners'),
+                    axios.get('/api/area_names')
+                ]);
+                const owners = ownersResponse.data;
+                const areas = areasResponse.data;
+                let html = '<ul>';
+                for (const [mapId, owner] of Object.entries(owners)) {
+                    const areaInfo = areas[mapId] || { name: `Area ${mapId}`, parentId: 0 };
+                    let areaName = areaInfo.name;
+                    if (areaInfo.parentId !== 0 && areas[areaInfo.parentId]) {
+                        areaName += ` (${areas[areaInfo.parentId].name})`;
+                    }
+                    html += `<li>${areaName} (ID: ${mapId}): ${owner}</li>`;
+                }
+                html += '</ul>';
+                mapOwnersList.innerHTML = html;
+            } catch (error) {
+                console.error("Failed to list map owners:", error);
+                mapOwnersList.innerHTML = 'Failed to load map owners. Check console for details.';
+            }
+        }
+
+        async function searchCharacterNFTs() {
+            const address = document.getElementById('searchAddress').value;
+            if (!address) {
+                alert("Please enter a wallet address.");
+                return;
+            }
+            try {
+                const response = await axios.get(`/get_player_token_id?playerAddress=${address}`);
+                const tokenId = response.data.tokenId;
+                if (tokenId) {
+                    const characterResponse = await axios.get(`/get_character?tokenId=${tokenId}`);
+                    const character = characterResponse.data.character;
+                    document.getElementById('characterNFTsList').innerHTML = `
+                        <p>Character Name: ${character.name}</p>
+                        <p>Level: ${character.level}</p>
+                        <p>Class: ${character.class}</p>
+                        <p>Race: ${character.race}</p>
+                        <p>Map ID: ${character.mapId}</p>
+                        <p>Zone ID: ${character.zoneId}</p>
+                        <p>Area ID: ${character.areaId}</p>
+                        <p>Coordinates: (${character.x}, ${character.y}, ${character.z})</p>
+                    `;
+                    const items = character.inventory;
+                    let itemsHtml = '<h3>Items</h3><ul>';
+                    for (const item of items) {
+                        itemsHtml += `<li>${item.name} (ID: ${item.id})</li>`;
+                    }
+                    itemsHtml += '</ul>';
+                    document.getElementById('characterItemsList').innerHTML = itemsHtml;
+                } else {
+                    document.getElementById('characterNFTsList').innerText = "No character NFT found for this address.";
+                    document.getElementById('characterItemsList').innerHTML = '';
+                }
+            } catch (error) {
+                console.error("Failed to search character NFTs:", error);
+                alert("Failed to search character NFTs. Check console for details.");
+            }
+        }
+
+        document.getElementById('connectWallet').addEventListener('click', connectWallet);
+        document.getElementById('buyMap').addEventListener('click', buyMap);
+        document.getElementById('listMapOwners').addEventListener('click', listMapOwners);
+        document.getElementById('searchCharacterNFTs').addEventListener('click', searchCharacterNFTs);
+
+        window.addEventListener('load', loadAreaNames);
+    </script>
+</body>
+</html>
