@@ -25,7 +25,7 @@ This project is intended for educational purposes only. It aims to showcase the 
 Is this useful, or how could it be enhanced? This project is a starting point for exploring the possibilities of Web3 in gaming, and we are eager to hear your thoughts and ideas.
 
 ## Architecture
-Sure, let's update the architecture description to reflect that the middleware server communicates with the WoW emulator (server) and not the client. The WoW server is the sole communicator with the player and the middleware, which connects to the blockchain.
+The WoW server is the sole communicator with the player and the middleware, which connects to the blockchain.
 
 ### Architecture Diagram Description
 
